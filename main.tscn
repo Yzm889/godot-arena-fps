@@ -1,0 +1,147 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://arena.tscn" id="2_arena"]
+[ext_resource type="Script" path="res://player.gd" id="3_player"]
+[ext_resource type="PackedScene" path="res://enemy.tscn" id="4_enemy"]
+[ext_resource type="PackedScene" path="res://hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://pause_menu.tscn" id="6_pause"]
+[ext_resource type="Script" path="res://navigation.gd" id="7_navigation"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_arena"]
+geometry_parsed_geometry_type = 1
+geometry_source_geometry_mode = 1
+geometry_source_group_name = &"navmesh_source"
+agent_radius = 0.5
+agent_height = 1.75
+agent_max_climb = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_weapon_metal"]
+albedo_color = Color(0.26, 0.27, 0.3, 1)
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_weapon_polymer"]
+albedo_color = Color(0.13, 0.13, 0.15, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_muzzle_flash"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.78, 0.35, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_receiver"]
+size = Vector3(0.085, 0.1, 0.34)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_barrel"]
+top_radius = 0.024
+bottom_radius = 0.024
+height = 0.26
+
+[sub_resource type="BoxMesh" id="BoxMesh_grip"]
+size = Vector3(0.055, 0.145, 0.08)
+
+[sub_resource type="BoxMesh" id="BoxMesh_magazine"]
+size = Vector3(0.05, 0.13, 0.07)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sight"]
+size = Vector3(0.024, 0.032, 0.09)
+
+[sub_resource type="SphereMesh" id="SphereMesh_muzzle_flash"]
+radius = 0.055
+height = 0.11
+radial_segments = 8
+rings = 4
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="Arena" parent="." instance=ExtResource("2_arena")]
+
+[node name="Navigation" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_arena")
+script = ExtResource("7_navigation")
+
+[node name="Player" type="CharacterBody3D" parent="." groups=["player"]]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("3_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="Camera3D" type="Camera3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="RayCast3D" type="RayCast3D" parent="Player/Camera3D"]
+enabled = true
+collision_mask = 5
+target_position = Vector3(0, 0, -50)
+
+[node name="Weapon" type="Node3D" parent="Player/Camera3D"]
+transform = Transform3D(0.998308, 0, 0.058145, 0, 1, 0, -0.058145, 0, 0.998308, 0.18, -0.145, -0.34)
+
+[node name="Receiver" type="MeshInstance3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.03)
+mesh = SubResource("BoxMesh_receiver")
+material_override = SubResource("StandardMaterial3D_weapon_metal")
+
+[node name="Barrel" type="MeshInstance3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.032, -0.28)
+mesh = SubResource("CylinderMesh_barrel")
+material_override = SubResource("StandardMaterial3D_weapon_metal")
+
+[node name="Grip" type="MeshInstance3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 0.951057, 0.308983, 0, -0.308983, 0.951057, 0, -0.105, 0.085)
+mesh = SubResource("BoxMesh_grip")
+material_override = SubResource("StandardMaterial3D_weapon_polymer")
+
+[node name="Magazine" type="MeshInstance3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 0.970296, -0.241922, 0, 0.241922, 0.970296, 0, -0.095, -0.06)
+mesh = SubResource("BoxMesh_magazine")
+material_override = SubResource("StandardMaterial3D_weapon_polymer")
+
+[node name="Sight" type="MeshInstance3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.068, -0.12)
+mesh = SubResource("BoxMesh_sight")
+material_override = SubResource("StandardMaterial3D_weapon_polymer")
+
+[node name="Muzzle" type="Node3D" parent="Player/Camera3D/Weapon"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.032, -0.42)
+
+[node name="MuzzleFlash" type="OmniLight3D" parent="Player/Camera3D/Weapon/Muzzle"]
+light_color = Color(1, 0.75, 0.35, 1)
+light_energy = 0.0
+omni_range = 4.0
+
+[node name="FlashMesh" type="MeshInstance3D" parent="Player/Camera3D/Weapon/Muzzle"]
+visible = false
+mesh = SubResource("SphereMesh_muzzle_flash")
+material_override = SubResource("StandardMaterial3D_muzzle_flash")
+
+[node name="ShootSound" type="AudioStreamPlayer" parent="Player"]
+volume_db = -4.0
+
+[node name="HurtSound" type="AudioStreamPlayer" parent="Player"]
+volume_db = -2.0
+
+[node name="DeathSound" type="AudioStreamPlayer" parent="Player"]
+process_mode = 3
+volume_db = -2.0
+
+[node name="Enemy" parent="." instance=ExtResource("4_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+
+[node name="Enemy2" parent="." instance=ExtResource("4_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -9)
+
+[node name="Enemy3" parent="." instance=ExtResource("4_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -9)
+
+[node name="HUD" parent="." instance=ExtResource("5_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("6_pause")]

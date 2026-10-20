@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_role.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "ranged"
+speed = 3.4
+attack_damage = 10
+attack_cooldown = 2.5
+max_hp = 75
+body_color = Color(0.6, 0.25, 0.9, 1)
+telegraph_color = Color(0.6, 0.25, 0.9, 1)

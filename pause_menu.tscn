@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://pause_menu.gd" id="1_pause"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 20
+script = ExtResource("1_pause")
+
+[node name="Root" type="Control" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="CenterContainer" type="CenterContainer" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Root/CenterContainer"]
+theme_override_constants/separation = 18
+
+[node name="TitleLabel" type="Label" parent="Root/CenterContainer/VBoxContainer"]
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 56
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="Root/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(260, 52)
+theme_override_font_sizes/font_size = 22
+text = "RESUME"
+
+[node name="RestartButton" type="Button" parent="Root/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(260, 52)
+theme_override_font_sizes/font_size = 22
+text = "RESTART"
+
+[node name="QuitButton" type="Button" parent="Root/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(260, 52)
+theme_override_font_sizes/font_size = 22
+text = "QUIT"

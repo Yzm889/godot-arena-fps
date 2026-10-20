@@ -1,0 +1,36 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://enemy_projectile.gd" id="1_projectile"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_projectile"]
+radius = 0.18
+
+[sub_resource type="SphereMesh" id="SphereMesh_projectile"]
+radius = 0.16
+height = 0.32
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_projectile"]
+albedo_color = Color(0.8, 0.4, 1, 1)
+emission_enabled = true
+emission = Color(0.55, 0.15, 1, 1)
+emission_energy_multiplier = 3.0
+
+[node name="EnemyProjectile" type="CharacterBody3D" groups=["enemy_projectiles"]]
+collision_layer = 8
+collision_mask = 3
+motion_mode = 1
+script = ExtResource("1_projectile")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_projectile")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_projectile")
+material_override = SubResource("StandardMaterial3D_projectile")
+
+[node name="Glow" type="OmniLight3D" parent="."]
+light_color = Color(0.65, 0.3, 1, 1)
+light_energy = 1.4
+omni_range = 2.5

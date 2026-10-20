@@ -1,0 +1,190 @@
+[gd_scene load_steps=18 format=3]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(30, 0.2, 30)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+size = Vector3(30, 0.2, 30)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_long"]
+size = Vector3(24, 3, 0.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_long"]
+size = Vector3(24, 3, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_side"]
+size = Vector3(0.5, 3, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_side"]
+size = Vector3(0.5, 3, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_crate"]
+size = Vector3(1.6, 1.6, 1.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_crate"]
+size = Vector3(1.6, 1.6, 1.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_platform"]
+size = Vector3(6, 1, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_platform"]
+size = Vector3(6, 1, 6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ramp"]
+size = Vector3(4, 0.3, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ramp"]
+size = Vector3(4, 0.3, 6)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.36, 0.38, 0.42, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
+albedo_color = Color(0.55, 0.58, 0.62, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crate"]
+albedo_color = Color(0.68, 0.46, 0.24, 1)
+roughness = 0.75
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_platform"]
+albedo_color = Color(0.4, 0.54, 0.7, 1)
+roughness = 0.7
+
+[sub_resource type="Environment" id="Environment_arena"]
+background_mode = 1
+background_color = Color(0.1, 0.14, 0.2, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.78, 0.82, 0.9, 1)
+ambient_light_energy = 0.4
+tonemap_mode = 2
+adjustment_enabled = true
+adjustment_contrast = 1.06
+adjustment_saturation = 1.12
+
+[node name="Arena" type="Node3D" groups=["navmesh_source"]]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_arena")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.642788, 0.766044, 0, -0.766044, 0.642788, 0, 10, 0)
+light_color = Color(1, 0.97, 0.92, 1)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_ground")
+material_override = SubResource("StandardMaterial3D_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_ground")
+
+[node name="Walls" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="NorthMesh" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -12)
+mesh = SubResource("BoxMesh_wall_long")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="NorthShape" type="CollisionShape3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -12)
+shape = SubResource("BoxShape3D_wall_long")
+
+[node name="SouthMesh" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 12)
+mesh = SubResource("BoxMesh_wall_long")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="SouthShape" type="CollisionShape3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 12)
+shape = SubResource("BoxShape3D_wall_long")
+
+[node name="EastMesh" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.5, 0)
+mesh = SubResource("BoxMesh_wall_side")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="EastShape" type="CollisionShape3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.5, 0)
+shape = SubResource("BoxShape3D_wall_side")
+
+[node name="WestMesh" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.5, 0)
+mesh = SubResource("BoxMesh_wall_side")
+material_override = SubResource("StandardMaterial3D_wall")
+
+[node name="WestShape" type="CollisionShape3D" parent="Walls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.5, 0)
+shape = SubResource("BoxShape3D_wall_side")
+
+[node name="Cover" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="Crate1Mesh" type="MeshInstance3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.8, -4)
+mesh = SubResource("BoxMesh_crate")
+material_override = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate1Shape" type="CollisionShape3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.8, -4)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Crate2Mesh" type="MeshInstance3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.8, -6)
+mesh = SubResource("BoxMesh_crate")
+material_override = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate2Shape" type="CollisionShape3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.8, -6)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Crate3Mesh" type="MeshInstance3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.8, 4)
+mesh = SubResource("BoxMesh_crate")
+material_override = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate3Shape" type="CollisionShape3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.8, 4)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Crate4Mesh" type="MeshInstance3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.8, 3)
+mesh = SubResource("BoxMesh_crate")
+material_override = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate4Shape" type="CollisionShape3D" parent="Cover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.8, 3)
+shape = SubResource("BoxShape3D_crate")
+
+[node name="Platform" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="PlatformMesh" type="MeshInstance3D" parent="Platform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, -7)
+mesh = SubResource("BoxMesh_platform")
+material_override = SubResource("StandardMaterial3D_platform")
+
+[node name="PlatformShape" type="CollisionShape3D" parent="Platform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, -7)
+shape = SubResource("BoxShape3D_platform")
+
+[node name="RampMesh" type="MeshInstance3D" parent="Platform"]
+transform = Transform3D(1, 0, 0, 0, 0.984808, 0.173648, 0, -0.173648, 0.984808, 8, 0.3315, -1)
+mesh = SubResource("BoxMesh_ramp")
+material_override = SubResource("StandardMaterial3D_platform")
+
+[node name="RampShape" type="CollisionShape3D" parent="Platform"]
+transform = Transform3D(1, 0, 0, 0, 0.984808, 0.173648, 0, -0.173648, 0.984808, 8, 0.3315, -1)
+shape = SubResource("BoxShape3D_ramp")

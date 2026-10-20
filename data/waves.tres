@@ -1,0 +1,7 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/wave_table.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+waves = [[3, 0, 0], [4, 0, 0], [4, 1, 0], [4, 2, 0], [4, 2, 1], [4, 2, 2], [4, 3, 2], [4, 3, 3], [3, 4, 3], [3, 3, 4]]

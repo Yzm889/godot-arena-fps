@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_role.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "melee"
+speed = 4.3
+attack_damage = 10
+attack_cooldown = 1.0
+max_hp = 100
+body_color = Color(0.75, 0.15, 0.2, 1)
+telegraph_color = Color(1, 0.2, 0.08, 1)
