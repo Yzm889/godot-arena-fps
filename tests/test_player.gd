@@ -30,6 +30,11 @@ class SpreadRecorder extends RefCounted:
 
 func run(ctx) -> void:
 	await _test_movement(ctx)
+	await _test_jump(ctx)
+	await _test_air_control(ctx)
+	await _test_weapon_data(ctx)
+	await _test_weapon_switch(ctx)
+	await _test_shotgun(ctx)
 	await _test_single_shot(ctx)
 	await _test_miss_branch(ctx)
 	await _test_autofire_cadence(ctx)
@@ -89,6 +94,287 @@ func _test_movement(ctx) -> void:
 	Input.action_release("move_forward")
 	ctx.check_near(player.rotation.y, yaw_before, 0.0001,
 		"movement never rotates the body yaw")
+
+
+func _test_jump(ctx) -> void:
+	ctx.begin_suite("player/jump")
+	var refs := await _begin(ctx)
+	var player: Node = refs["player"]
+
+	await ctx.step(5)
+	ctx.check(player.is_on_floor(), "jump: grounded before takeoff")
+	var ground_y: float = player.global_position.y
+	ctx.check_near(ground_y, 0.0, 0.05, "jump: feet rest on the arena floor at y=0")
+
+	Input.action_press("jump")
+	var lifted: bool = await ctx.step_until(func() -> bool: return not player.is_on_floor(), 5)
+	Input.action_release("jump")
+	ctx.check(lifted, "jump: one press leaves the floor within 5 ticks")
+	ctx.check(player.velocity.y > 0.0, "jump: upward velocity is applied")
+
+	var peak: float = player.global_position.y
+	var airborne_ticks := 0
+	var landed: bool = false
+	var descent_probed := false
+	for _tick in 120:
+		await ctx.step(1)
+		peak = maxf(peak, player.global_position.y)
+		if player.is_on_floor():
+			landed = true
+			break
+		airborne_ticks += 1
+
+		if not descent_probed and player.velocity.y < -1.0:
+			descent_probed = true
+			var vy_descending: float = player.velocity.y
+			player.call("_try_jump")
+			ctx.check_near(float(player.velocity.y), vy_descending, 0.0001,
+				"jump: calling _try_jump during descent adds nothing")
+
+			Input.action_press("jump")
+			await ctx.step(1)
+			Input.action_release("jump")
+			peak = maxf(peak, player.global_position.y)
+			ctx.check(player.velocity.y < 0.0, "jump: a mid-air press never restarts the ascent")
+			airborne_ticks += 1
+
+	ctx.check(landed, "jump: the player lands again within 120 ticks")
+
+	var gravity: float = absf((player.call("get_gravity") as Vector3).y)
+	var jump_v: float = float(player.get("jump_velocity"))
+	var airborne_gravity: float = gravity * float(player.get("air_gravity_scale"))
+	var expected_peak: float = ground_y + jump_v * jump_v / (2.0 * airborne_gravity)
+	ctx.check_near(peak, expected_peak, 0.20, "jump: apex follows jump_velocity and airborne gravity")
+	ctx.check_in_range(peak, 1.05, 1.55, "jump: apex clears the 1.0 m platform but not the 1.6 m crates")
+
+	var expected_ticks: float = 2.0 * jump_v / airborne_gravity * 60.0
+	ctx.check_in_range(float(airborne_ticks), expected_ticks - 10.0, expected_ticks + 10.0,
+		"jump: airtime matches jump_velocity and airborne gravity")
+	ctx.check_in_range(float(airborne_ticks), 27.0, 48.0,
+		"jump: hang time stays inside 0.45-0.80 s")
+
+	await ctx.step(4)
+	ctx.check(player.is_on_floor(), "jump: settled back on the floor")
+	Input.action_press("jump")
+	var rejumped: bool = await ctx.step_until(func() -> bool: return not player.is_on_floor(), 5)
+	Input.action_release("jump")
+	ctx.check(rejumped, "jump: the floor accepts another jump after landing")
+	await ctx.step_until(func() -> bool: return player.is_on_floor(), 120)
+
+	player.call("take_damage", 999)
+	Input.action_press("jump")
+	await ctx.step(4)
+	Input.action_release("jump")
+	ctx.check_near(float(player.velocity.y), 0.0, 0.0001, "jump: a dead player cannot jump")
+	ctx.check(player.is_on_floor(), "jump: a dead player stays on the floor")
+
+
+func _test_air_control(ctx) -> void:
+	ctx.begin_suite("player/air_control")
+	var refs := await _begin(ctx)
+	var player: Node = refs["player"]
+
+	await ctx.step(5)
+	Input.action_press("move_forward")
+	await ctx.step(6)
+	ctx.check_near(float(player.velocity.z), -SPEED, 0.05, "air control: ground steering still snaps to -SPEED")
+
+	Input.action_press("jump")
+	var lifted: bool = await ctx.step_until(func() -> bool: return not player.is_on_floor(), 5)
+	Input.action_release("jump")
+	ctx.check(lifted, "air control: airborne after the jump")
+
+	var per_tick: float = float(player.get("air_acceleration")) / 60.0
+	var z_before: float = player.velocity.z
+	ctx.check_in_range(z_before, -SPEED, -SPEED + 3.0 * per_tick, "air control: horizontal speed survives takeoff")
+	ctx.check(2.0 * SPEED / (per_tick * 60.0) > 0.3,
+		"air control: a full reversal takes longer than 0.3 s, so air steering is not instant")
+
+	Input.action_release("move_forward")
+	Input.action_press("move_back")
+	await ctx.step(3)
+	var steer_gain: float = float(player.velocity.z) - z_before
+	ctx.check_in_range(steer_gain, 0.5 * per_tick, 3.5 * per_tick,
+		"air control: mid-air steering ramps by air_acceleration each tick")
+	ctx.check(float(player.velocity.z) < 0.0,
+		"air control: still steering the old way, where the ground would have snapped to +SPEED")
+	Input.action_release("move_back")
+
+	var landed: bool = await ctx.step_until(func() -> bool: return player.is_on_floor(), 120)
+	ctx.check(landed, "air control: the player lands again")
+	Input.action_press("move_forward")
+	await ctx.step(2)
+	ctx.check_near(float(player.velocity.z), -SPEED, 0.05, "air control: instant steering returns on the floor")
+	Input.action_release("move_forward")
+
+
+func _test_weapon_data(ctx) -> void:
+	ctx.begin_suite("player/weapon_data")
+	var refs := await _begin(ctx)
+	var player: Node = refs["player"]
+	var rifle: Resource = load("res://data/weapon_rifle.tres")
+	var shotgun: Resource = load("res://data/weapon_shotgun.tres")
+
+	ctx.check(rifle != null and shotgun != null, "weapon data: both resources load")
+	ctx.check(rifle != shotgun, "weapon data: rifle and shotgun are separate resources")
+	ctx.check_eq(String(rifle.resource_path), "res://data/weapon_rifle.tres",
+		"weapon data: the player opens on the authored rifle resource")
+	ctx.check_eq(int(player.get("_weapon_index")), 0, "weapon data: the player starts on index 0")
+	ctx.check(player.call("weapon") == rifle, "weapon data: weapon() returns the equipped resource")
+
+	# These are the pre-refactor numbers. If they moved, the tuned ammo economy moved with them.
+	ctx.check_eq(int(rifle.damage), 25, "weapon data: rifle damage is still 25")
+	ctx.check_eq(int(rifle.pellet_count), 1, "weapon data: rifle still casts one ray")
+	ctx.check_near(float(rifle.fire_interval), 0.12, 0.0001, "weapon data: rifle cadence is still 0.12 s")
+	ctx.check_near(float(rifle.reload_time), 1.0, 0.0001, "weapon data: rifle reload is still 1.0 s")
+	ctx.check_eq(int(rifle.mag_size), 40, "weapon data: rifle magazine is still 40")
+	ctx.check_near(float(rifle.base_spread_degrees), 0.0, 0.0001, "weapon data: rifle adds no base cone")
+	ctx.check_near(float(rifle.recoil_multiplier), 1.0, 0.0001, "weapon data: rifle recoil is unchanged")
+	ctx.check_eq(int(shotgun.pellet_count), 8, "weapon data: shotgun casts eight pellets")
+	ctx.check_eq(int(shotgun.mag_size), 8, "weapon data: shotgun magazine is 8")
+
+
+func _test_weapon_switch(ctx) -> void:
+	ctx.begin_suite("player/weapon_switch")
+	var refs := await _begin(ctx)
+	var player: Node = refs["player"]
+	var shotgun: Resource = load("res://data/weapon_shotgun.tres")
+	var names := RECORDER.new()
+	player.weapon_changed.connect(func(display_name: String) -> void: names.remember(display_name))
+
+	# Let the deferred startup emissions land before asserting on their ordering.
+	await ctx.step(2)
+	for _i in 3:
+		player.set("_fire_timer", 0.0)
+		player.call("shoot")
+	ctx.check_eq(int(player.ammo), 37, "switch: rifle down to 37 first")
+	var reserve_before: int = player.reserve
+
+	var events_before: int = names.value
+	player.call("select_weapon", 1)
+	ctx.check_eq(int(player.ammo), 8, "switch: the shotgun carries its own full magazine")
+	ctx.check_eq(int(player.reserve), reserve_before, "switch: the reserve pool is shared, not split")
+	ctx.check_eq(names.value, events_before + 1, "switch: one weapon_changed per switch")
+	ctx.check_eq(String(names.events[names.events.size() - 1]), "SHOTGUN", "switch: announces SHOTGUN")
+	ctx.check_eq(ctx.hud_text("WeaponLabel"), "SHOTGUN", "switch: the HUD label follows the signal alone")
+
+	for _i in 2:
+		player.set("_fire_timer", 0.0)
+		player.call("shoot")
+	ctx.check_eq(int(player.ammo), 6, "switch: shotgun down to 6")
+	player.call("select_weapon", 0)
+	ctx.check_eq(int(player.ammo), 37, "switch: back to the rifle, its spent magazine returns, not a fresh one")
+
+	var noop_before: int = names.value
+	player.call("select_weapon", 0)
+	ctx.check_eq(names.value, noop_before, "switch: re-selecting the equipped weapon emits nothing")
+
+	player.call("select_weapon", 2)
+	ctx.check_eq(int(player.get("_weapon_index")), 0, "switch: index 2 is out of range and ignored")
+	player.call("select_weapon", -1)
+	ctx.check_eq(int(player.get("_weapon_index")), 0, "switch: a negative index is ignored")
+
+	player.call("reload")
+	ctx.check(bool(player.get("_reloading")), "switch: rifle reload started")
+	player.call("select_weapon", 1)
+	ctx.check_eq(int(player.get("_weapon_index")), 0, "switch: refused while reloading")
+	await ctx.step(RELOAD_TICKS)
+	ctx.check_eq(int(player.ammo), 40, "switch: the interrupted-by-nothing reload still completed on the rifle")
+
+	Input.action_press("weapon_2")
+	await ctx.step(2)
+	Input.action_release("weapon_2")
+	ctx.check_eq(int(player.get("_weapon_index")), 1, "switch: the weapon_2 action reaches the player")
+
+	var barrel: Node = player.get_node("Camera3D/Weapon/Barrel")
+	var sight: Node = player.get_node("Camera3D/Weapon/Sight")
+	var shoot_sound: Node = player.get_node("ShootSound")
+	ctx.check(barrel.scale == shotgun.barrel_scale, "switch: the shotgun barrel scale is applied")
+	ctx.check(not sight.visible, "switch: the shotgun hides the rifle sight")
+	ctx.check_near(float(shoot_sound.pitch_scale), 0.65, 0.0001, "switch: the shotgun fires at a lower pitch")
+
+	Input.action_press("weapon_1")
+	await ctx.step(2)
+	Input.action_release("weapon_1")
+	ctx.check_near(float(barrel.scale.x), 1.0, 0.0001, "switch: the rifle barrel scale comes back")
+	ctx.check(sight.visible, "switch: the rifle sight is shown again")
+
+	player.call("select_weapon", 1)
+	player.call("take_damage", 999)
+	player.call("select_weapon", 0)
+	ctx.check_eq(int(player.get("_weapon_index")), 1, "switch: a dead player cannot change weapons")
+
+
+func _test_shotgun(ctx) -> void:
+	ctx.begin_suite("player/shotgun")
+	var refs := await _begin(ctx)
+	var player: Node = refs["player"]
+	var ray: RayCast3D = refs["ray"]
+	var shots := ShotRecorder.new()
+	player.shot_fired.connect(shots.on_shot)
+	var hits := RECORDER.new()
+	player.shot_hit.connect(func(point: Vector3) -> void: hits.remember(point))
+	var enemy_hits := RECORDER.new()
+	player.enemy_hit.connect(func() -> void: enemy_hits.hit())
+	var spread_log := SpreadRecorder.new()
+	player.spread_changed.connect(spread_log.on_spread)
+
+	player.call("select_weapon", 1)
+	_reset_spread(player, ray)
+	player.set("_fire_timer", 0.0)
+	player.call("shoot")
+
+	ctx.check_eq(shots.count, 1, "shotgun: one trigger pull is one shot_fired")
+	ctx.check_eq(int(player.ammo), 7, "shotgun: a pull spends one shell, not eight")
+	ctx.check_near(player.get("_fire_timer"), 0.75, 0.0001, "shotgun: the resource's 0.75 s interval gates the next pull")
+	ctx.check(hits.value >= 2, "shotgun: a blast lands several pellets at once (got %d)" % hits.value)
+	ctx.check(hits.value <= 8, "shotgun: never more hit reports than pellets (got %d)" % hits.value)
+	ctx.check_eq(enemy_hits.value, 0, "shotgun: scenery hits are not enemy hits")
+	ctx.check_near(spread_log.last_movement, 0.6, 0.0001, "shotgun: its cone is folded into the HUD spread signal")
+
+	var cone_max := 0.0
+	var beyond_rifle_cap := false
+	_reset_spread(player, ray)
+	for _i in 24:
+		var target: Vector3 = player.call("_spread_ray_target", 4.0)
+		var degrees: float = rad_to_deg(RAY_BACK.normalized().angle_to(target))
+		cone_max = maxf(cone_max, degrees)
+		if degrees > 1.0:
+			beyond_rifle_cap = true
+	ctx.check(beyond_rifle_cap, "shotgun: the base cone pushes rays past the rifle's 1.0 degree cap")
+	ctx.check(cone_max <= 4.0 + 0.001, "shotgun: every ray stays inside the 4 degree cone (max %.3f)" % cone_max)
+	ctx.check_eq(player.call("_spread_ray_target", 0.0), RAY_BACK,
+		"shotgun: a zero cone with no dynamic spread is still dead centre")
+
+	var enemy: Node = load("res://enemy.tscn").instantiate()
+	enemy.position = Vector3(0, 0, -4)
+	refs["main"].add_child(enemy)
+	enemy.set("hp", 400)
+	await ctx.step(2)
+	var enemy_hp_before: int = enemy.hp
+	var enemy_hits_before: int = enemy_hits.value
+	player.set("_fire_timer", 0.0)
+	player.call("shoot")
+	var dealt: int = enemy_hp_before - int(enemy.hp)
+	ctx.check(dealt >= 15, "shotgun: the blast lands at least one pellet (%d damage)" % dealt)
+	ctx.check_eq(dealt % 15, 0, "shotgun: damage arrives in whole pellets of 15 (%d damage)" % dealt)
+	ctx.check_eq(enemy_hits.value, enemy_hits_before + 1,
+		"shotgun: exactly one enemy_hit per pull, however many pellets connect")
+
+	refs["main"].remove_child(enemy)
+	enemy.queue_free()
+	await ctx.step(2)
+
+	player.set("_fire_timer", 0.0)
+	player.set("ammo", 1)
+	player.call("shoot")
+	ctx.check_eq(int(player.ammo), 0, "shotgun: the last shell still fires")
+	ctx.check(bool(player.get("_reloading")), "shotgun: an empty magazine auto-reloads")
+	await ctx.step(70)
+	ctx.check_eq(int(player.ammo), 0, "shotgun: still reloading at 70 ticks, where the rifle would be done")
+	ctx.check(bool(player.get("_reloading")), "shotgun: the reload flag holds through 70 ticks")
+	await ctx.step(40)
+	ctx.check_eq(int(player.ammo), 8, "shotgun: the 1.6 s reload completes by 110 ticks")
 
 
 func _test_single_shot(ctx) -> void:

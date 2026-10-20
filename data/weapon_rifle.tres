@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "RIFLE"
+damage = 25
+pellet_count = 1
+fire_interval = 0.12
+reload_time = 1.0
+mag_size = 40
+base_spread_degrees = 0.0
+crosshair_spread = 0.0
+recoil_multiplier = 1.0
+sound_pitch = 1.0
+barrel_scale = Vector3(1, 1, 1)
+hide_sight = false

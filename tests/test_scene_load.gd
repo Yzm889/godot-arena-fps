@@ -30,6 +30,7 @@ const NODE_SPEC := [
 	["HUD/HealthBar/HPText", "Label"],
 	["HUD/EnemyLabel", "Label"],
 	["HUD/AmmoLabel", "Label"],
+	["HUD/WeaponLabel", "Label"],
 	["HUD/WaveLabel", "Label"],
 	["HUD/WaveBanner", "Label"],
 	["HUD/ReloadLabel", "Label"],

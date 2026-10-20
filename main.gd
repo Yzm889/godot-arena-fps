@@ -46,6 +46,7 @@ func _ready() -> void:
 	_high_score = _load_high_score()
 	_player.hp_changed.connect(_hud.update_health)
 	_player.ammo_changed.connect(_hud.update_ammo)
+	_player.weapon_changed.connect(_hud.update_weapon_name)
 	_player.shot_fired.connect(_on_shot_fired)
 	_player.shot_fired.connect(_hud.kick_crosshair)
 	_player.shot_hit.connect(_on_shot_hit)

@@ -8,6 +8,7 @@ signal enemy_hit
 signal ammo_changed(ammo: int, mag_size: int, reserve: int)
 signal reload_changed(reloading: bool)
 signal spread_changed(movement: float, fire: float)
+signal weapon_changed(display_name: String)
 
 const Sfx = preload("res://sfx.gd")
 
@@ -18,12 +19,12 @@ const MAX_HP := 100
 const SPEED := 5.0
 const MOUSE_SENSITIVITY := 0.002
 const PITCH_LIMIT := 1.55
-const DAMAGE := 25
-const MAG_SIZE := 40
 const RESERVE_START := 120
 const RESERVE_MAX := 240
-const FIRE_RATE := 0.12
-const RELOAD_TIME := 1.0
+const WEAPONS := [
+	preload("res://data/weapon_rifle.tres"),
+	preload("res://data/weapon_shotgun.tres"),
+]
 const MUZZLE_FLASH_TIME := 0.05
 const MUZZLE_FLASH_ENERGY := 2.5
 const WEAPON_RECOIL_OFFSET := Vector3(0.0, 0.0, 0.05)
@@ -40,8 +41,10 @@ const MOVEMENT_SPREAD_LERP := 10.0
 const SPREAD_EMIT_EPSILON := 0.005
 
 var hp := MAX_HP
-var ammo := MAG_SIZE
+var ammo: int = WEAPONS[0].mag_size
 var reserve := RESERVE_START
+var _weapon_index := 0
+var _mags: Array[int] = [WEAPONS[0].mag_size, WEAPONS[1].mag_size]
 var _fire_timer := 0.0
 var _reloading := false
 var _pitch := 0.0
@@ -63,6 +66,8 @@ var _emitted_fire_spread := -1.0
 @onready var _camera: Camera3D = $Camera3D
 @onready var _ray: RayCast3D = $Camera3D/RayCast3D
 @onready var _weapon: Node3D = $Camera3D/Weapon
+@onready var _barrel: MeshInstance3D = $Camera3D/Weapon/Barrel
+@onready var _sight: MeshInstance3D = $Camera3D/Weapon/Sight
 @onready var _muzzle_flash: OmniLight3D = $Camera3D/Weapon/Muzzle/MuzzleFlash
 @onready var _flash_mesh: MeshInstance3D = $Camera3D/Weapon/Muzzle/FlashMesh
 @onready var _shoot_sound: AudioStreamPlayer = $ShootSound
@@ -73,6 +78,9 @@ var _emitted_fire_spread := -1.0
 @export_range(0.0, 5.0, 0.05) var recoil_per_shot_degrees := 0.3
 @export_range(0.0, 10.0, 0.1) var recoil_max_degrees := 1.5
 @export_range(0.0, 5.0, 0.1) var max_spread_angle_degrees := 1.0
+@export_range(3.0, 8.0, 0.1) var jump_velocity := 7.0
+@export_range(4.0, 40.0, 0.5) var air_acceleration := 18.0
+@export_range(1.0, 3.0, 0.05) var air_gravity_scale := 2.0
 
 
 func _ready() -> void:
@@ -84,8 +92,34 @@ func _ready() -> void:
 	_weapon_rest_rotation = _weapon.rotation
 	_flash_material = _flash_mesh.material_override as StandardMaterial3D
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_apply_weapon_look()
 	hp_changed.emit.call_deferred(hp, MAX_HP)
-	ammo_changed.emit.call_deferred(ammo, MAG_SIZE, reserve)
+	ammo_changed.emit.call_deferred(ammo, weapon().mag_size, reserve)
+	weapon_changed.emit.call_deferred(weapon().display_name)
+
+
+func weapon() -> Resource:
+	return WEAPONS[_weapon_index]
+
+
+func _apply_weapon_look() -> void:
+	var data := weapon()
+	_barrel.scale = data.barrel_scale
+	_sight.visible = not data.hide_sight
+	_shoot_sound.pitch_scale = data.sound_pitch
+
+
+func select_weapon(index: int) -> void:
+	if _dead or _reloading or index < 0 or index >= WEAPONS.size() or index == _weapon_index:
+		return
+
+	_mags[_weapon_index] = ammo
+	_weapon_index = index
+	ammo = _mags[index]
+	_fire_timer = 0.0
+	_apply_weapon_look()
+	ammo_changed.emit(ammo, weapon().mag_size, reserve)
+	weapon_changed.emit(weapon().display_name)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -114,28 +148,35 @@ func shoot() -> void:
 		reload()
 		return
 
+	var data := weapon()
 	ammo -= 1
-	_fire_timer += FIRE_RATE
-	ammo_changed.emit(ammo, MAG_SIZE, reserve)
+	_fire_timer += data.fire_interval
+	ammo_changed.emit(ammo, data.mag_size, reserve)
 	shot_fired.emit()
 	_shoot_sound.play()
 	_alert_nearby_enemies()
 	_flash_muzzle()
 	_kick_weapon()
-	_apply_ray_spread()
-	_ray.force_raycast_update()
 
-	if _ray.is_colliding():
+	var wounded := false
+	for _pellet in data.pellet_count:
+		_ray.target_position = _spread_ray_target(data.base_spread_degrees)
+		_ray.force_raycast_update()
+		if not _ray.is_colliding():
+			if DEBUG_LOG:
+				print("Miss")
+			continue
+
 		var collider := _ray.get_collider()
 		if DEBUG_LOG:
 			print("Hit: ", collider)
 		shot_hit.emit(_ray.get_collision_point())
 		if collider and collider.has_method("take_damage"):
-			collider.take_damage(DAMAGE)
-			enemy_hit.emit()
-	else:
-		if DEBUG_LOG:
-			print("Miss")
+			collider.take_damage(data.damage)
+			wounded = true
+
+	if wounded:
+		enemy_hit.emit()
 
 	_kick_camera_recoil()
 	_settle_timer = SHOT_SETTLE_DELAY
@@ -146,16 +187,16 @@ func shoot() -> void:
 		reload()
 
 
-func _apply_ray_spread() -> void:
-	var angle := deg_to_rad(max_spread_angle_degrees) * clampf(_movement_spread + _fire_spread, 0.0, 1.0)
+func _spread_ray_target(base_degrees: float) -> Vector3:
+	var angle := deg_to_rad(base_degrees) \
+			+ deg_to_rad(max_spread_angle_degrees) * clampf(_movement_spread + _fire_spread, 0.0, 1.0)
 	if angle <= 0.00001:
-		_ray.target_position = Vector3(0.0, 0.0, -RAY_LENGTH)
-		return
+		return Vector3(0.0, 0.0, -RAY_LENGTH)
 
 	var theta := angle * sqrt(randf())
 	var phi := randf() * TAU
 	var lateral := tan(theta)
-	_ray.target_position = Vector3(cos(phi) * lateral, sin(phi) * lateral, -1.0).normalized() * RAY_LENGTH
+	return Vector3(cos(phi) * lateral, sin(phi) * lateral, -1.0).normalized() * RAY_LENGTH
 
 
 func _alert_nearby_enemies() -> void:
@@ -164,21 +205,21 @@ func _alert_nearby_enemies() -> void:
 
 
 func reload() -> void:
-	if _dead or _reloading or reserve <= 0 or ammo == MAG_SIZE:
+	if _dead or _reloading or reserve <= 0 or ammo == weapon().mag_size:
 		return
 
 	_reloading = true
 	reload_changed.emit(true)
-	await get_tree().create_timer(RELOAD_TIME, false).timeout
+	await get_tree().create_timer(weapon().reload_time, false).timeout
 	if not is_inside_tree():
 		return
 
-	var take := mini(MAG_SIZE - ammo, reserve)
+	var take := mini(weapon().mag_size - ammo, reserve)
 	ammo += take
 	reserve -= take
 	_reloading = false
 	reload_changed.emit(false)
-	ammo_changed.emit(ammo, MAG_SIZE, reserve)
+	ammo_changed.emit(ammo, weapon().mag_size, reserve)
 
 
 func add_reserve(amount: int) -> void:
@@ -190,7 +231,7 @@ func add_reserve(amount: int) -> void:
 		return
 
 	reserve = new_reserve
-	ammo_changed.emit(ammo, MAG_SIZE, reserve)
+	ammo_changed.emit(ammo, weapon().mag_size, reserve)
 
 
 func take_damage(amount: int) -> void:
@@ -270,7 +311,8 @@ func _kick_weapon() -> void:
 
 
 func _kick_camera_recoil() -> void:
-	_recoil_pitch = minf(_recoil_pitch + deg_to_rad(recoil_per_shot_degrees), deg_to_rad(recoil_max_degrees))
+	var step := deg_to_rad(recoil_per_shot_degrees) * float(weapon().recoil_multiplier)
+	_recoil_pitch = minf(_recoil_pitch + step, deg_to_rad(recoil_max_degrees))
 	_apply_camera_pitch()
 
 	if _camera_recoil_tween and _camera_recoil_tween.is_valid():
@@ -303,13 +345,21 @@ func _update_spread(delta: float) -> void:
 
 
 func _publish_spread() -> void:
-	if absf(_movement_spread - _emitted_movement_spread) < SPREAD_EMIT_EPSILON \
+	var movement := minf(_movement_spread + weapon().crosshair_spread, 1.0)
+	if absf(movement - _emitted_movement_spread) < SPREAD_EMIT_EPSILON \
 			and absf(_fire_spread - _emitted_fire_spread) < SPREAD_EMIT_EPSILON:
 		return
 
-	_emitted_movement_spread = _movement_spread
+	_emitted_movement_spread = movement
 	_emitted_fire_spread = _fire_spread
-	spread_changed.emit(_movement_spread, _fire_spread)
+	spread_changed.emit(movement, _fire_spread)
+
+
+func _try_jump() -> void:
+	if _dead or not is_on_floor():
+		return
+
+	velocity.y = jump_velocity
 
 
 func _physics_process(delta: float) -> void:
@@ -317,8 +367,16 @@ func _physics_process(delta: float) -> void:
 	if _wants_fire() and _fire_timer <= 0.0:
 		shoot()
 
+	if Input.is_action_just_pressed("jump"):
+		_try_jump()
+
+	if Input.is_action_just_pressed("weapon_1"):
+		select_weapon(0)
+	elif Input.is_action_just_pressed("weapon_2"):
+		select_weapon(1)
+
 	if not is_on_floor():
-		velocity += get_gravity() * delta
+		velocity += get_gravity() * air_gravity_scale * delta
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 
@@ -327,7 +385,11 @@ func _physics_process(delta: float) -> void:
 	var right := Vector3(camera_basis.x.x, 0.0, camera_basis.x.z).normalized()
 	var direction := (right * input_dir.x - forward * input_dir.y).normalized()
 
-	velocity.x = direction.x * SPEED
-	velocity.z = direction.z * SPEED
+	if is_on_floor():
+		velocity.x = direction.x * SPEED
+		velocity.z = direction.z * SPEED
+	else:
+		velocity.x = move_toward(velocity.x, direction.x * SPEED, air_acceleration * delta)
+		velocity.z = move_toward(velocity.z, direction.z * SPEED, air_acceleration * delta)
 	move_and_slide()
 	_update_spread(delta)

@@ -11,6 +11,7 @@ const DEFEAT_COLOR := Color(1, 0.4, 0.35, 1)
 @onready var _hp_text: Label = $HealthBar/HPText
 @onready var _enemy_label: Label = $EnemyLabel
 @onready var _ammo_label: Label = $AmmoLabel
+@onready var _weapon_label: Label = $WeaponLabel
 @onready var _wave_label: Label = $WaveLabel
 @onready var _wave_banner: Label = $WaveBanner
 @onready var _reload_label: Label = $ReloadLabel
@@ -48,6 +49,10 @@ func update_ammo(current: int, _mag_size: int, reserve: int) -> void:
 	_ammo_label.text = "%d / %d" % [current, reserve]
 	var color := LOW_AMMO_COLOR if current <= LOW_AMMO_THRESHOLD else AMMO_COLOR
 	_ammo_label.add_theme_color_override("font_color", color)
+
+
+func update_weapon_name(display_name: String) -> void:
+	_weapon_label.text = display_name
 
 
 func update_wave(wave: int, total: int) -> void:

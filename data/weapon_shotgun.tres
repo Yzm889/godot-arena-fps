@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "SHOTGUN"
+damage = 15
+pellet_count = 8
+fire_interval = 0.75
+reload_time = 1.6
+mag_size = 8
+base_spread_degrees = 4.0
+crosshair_spread = 0.6
+recoil_multiplier = 2.5
+sound_pitch = 0.65
+barrel_scale = Vector3(1.35, 1.5, 1.35)
+hide_sight = true

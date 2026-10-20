@@ -12,7 +12,7 @@ const WATCHDOG_SECONDS := 240.0
 # awaiting run() still resumes and marks its file done, so checks silently vanish
 # while everything that did run passes. Comparing against this number turns that
 # into a loud failure; bump it deliberately whenever cases are added or removed.
-const EXPECTED_CHECKS := 543
+const EXPECTED_CHECKS := 621
 
 var _ctx
 var _timed_out := false
